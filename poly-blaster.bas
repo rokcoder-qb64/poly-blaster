@@ -215,7 +215,7 @@ Sub PrepareGame
     game.fps% = 30 ' 30 frames per second
     Randomize Timer
     glData.executing = TRUE
-    _DisplayOrder _Software , _Hardware , _GLRender
+    _DisplayOrder _Hardware , _GLRender , _Software
     GRAVITY! = -0.4 ' This should be a const but QB64pe doesn't allow fractional negative const values!
     LoadAllSFX
     ReadHiscore ' Read high scores from file (or create them if the file doesn't exist or can't be read)
@@ -354,14 +354,17 @@ End Sub
 Sub WaitToStart
     Static mouseDown%, selected%
     Dim mousePos As VECTORF
+    Dim w%, h%
+    w% = 93 * _Width(0) / SCREEN_WIDTH
+    h% = 46 * _Height(0) / SCREEN_HEIGHT
     mousePos.x! = _MouseX - _Width(0) / 2
     mousePos.y! = _Height(0) / 2 - _MouseY
     If _MouseButton(1) And Not mouseDown% Then
-        selected% = Abs(mousePos.x!) < 93 And Abs(mousePos.y!) < 46
+        selected% = Abs(mousePos.x!) < w% And Abs(mousePos.y!) < h%
     Else
         If Not _MouseButton(1) And mouseDown% Then
             If selected% Then
-                If Abs(mousePos.x!) < 93 And Abs(mousePos.y!) < 46 Then
+                If Abs(mousePos.x!) < w% And Abs(mousePos.y!) < h% Then
                     SetGameState STATE_NEWGAME
                     mouseDown% = FALSE
                     selected% = FALSE
