@@ -45,6 +45,8 @@ Const SCREEN_HEIGHT = 360
 Const GAME_WIDTH = 324
 Const MAX_COLUMNS = 7
 
+Const VERSION = 1
+
 Const SFX_BOOP = 0
 Const SFX_CLICK = 1
 Const SFX_GAMEOVER = 2
@@ -62,7 +64,7 @@ Const TARGET_BALLS = 10
 Const POLY_RADIUS = 20
 Const MAX_POLYS = 100 'This should be calculated but is definitely more than enough for a screen full of polygons
 Const BALL_RADIUS = 6
-Const MAX_BALLS = 100
+Const MAX_BALLS = 50
 
 Const MAX_BONUSES = 100 'This should be calculated but is definitely more than enough for a screen full of bonuses
 Const BONUS_RADIUS = 10
@@ -80,7 +82,17 @@ Const BONUS_TIMES_TWO = 2
 Const BONUS_GROW = 3
 Const BONUS_SHRINK = 4
 
+Const EASY = 0
+Const MEDIUM = 1
+Const HARD = 2
+
 '======================================================================================================================================================================================================
+
+Type HISCORE
+    easy As Integer
+    medium As Integer
+    hard As Integer
+End Type
 
 Type GAME
     rowCount As Integer
@@ -90,7 +102,7 @@ Type GAME
     totalPolys As Integer
     fps As Integer
     score As Integer
-    hiscore As Integer
+    level As Integer
 End Type
 
 Type VECTORF
@@ -151,6 +163,9 @@ Type GLDATA
     bubbleText As Long
     bonuses As Long
     start As Long
+    easy As Long
+    normal As Long
+    difficult As Long
 End Type
 
 Type SFX
@@ -175,6 +190,7 @@ Dim Shared sfx(3) As SFX
 Dim Shared quit As Integer
 Dim Shared exitProgram As Integer
 Dim Shared GRAVITY!
+Dim Shared hiscore%(3)
 
 '===== Game loop ======================================================================================================================================================================================
 
@@ -220,6 +236,7 @@ Sub PrepareGame
     LoadAllSFX
     ReadHiscore ' Read high scores from file (or create them if the file doesn't exist or can't be read)
     SetGameState STATE_WAIT_TO_START ' Set the game state in its initial state
+    game.level% = MEDIUM
 End Sub
 
 '===== High score code ================================================================================================================================================================================
@@ -227,12 +244,23 @@ End Sub
 ' ReadHiscores
 ' - Read high scores from local storage (with fallback to initialising data if there's an error while reading the file for any reason)
 Sub ReadHiscore
-    Dim handle&
+    Dim handle&, s%, v%
     On Error GoTo fileReadError
     If Not _FileExists("scores.txt") Then InitialiseHiscore: Exit Sub
     handle& = FreeFile
     Open "scores.txt" For Input As #handle&
-    Input #handle&, game.hiscore%
+    Input #handle&, s%
+    If EOF(handle&) Then
+        ' This was a high score file containing only hard level high score (before a version number was introduced)
+        hiscore%(EASY) = 0
+        hiscore%(MEDIUM) = 0
+        hiscore%(HARD) = s%
+    Else
+        v% = s%
+        Input #handle&, hiscore%(EASY)
+        Input #handle&, hiscore%(MEDIUM)
+        Input #handle&, hiscore%(HARD)
+    End If
     Close #handle&
     On Error GoTo 0
 End Sub
@@ -240,7 +268,9 @@ End Sub
 ' InitialiseHiscores
 ' - Set up default high score values
 Sub InitialiseHiscore
-    game.hiscore% = 0
+    hiscore%(EASY) = 0
+    hiscore%(MEDIUM) = 0
+    hiscore%(HARD) = 0
 End Sub
 
 ' WriteHiscores
@@ -250,7 +280,10 @@ Sub WriteHiscore
     On Error GoTo fileWriteError
     handle& = FreeFile
     Open "scores.txt" For Output As #handle&
-    Print #handle&, game.hiscore%
+    Print #handle&, VERSION
+    Print #handle&, hiscore%(EASY)
+    Print #handle&, hiscore%(MEDIUM)
+    Print #handle&, hiscore%(HARD)
     Close #handle&
     On Error GoTo 0
 End Sub
@@ -351,32 +384,41 @@ End Sub
 
 '======================================================================================================================================================================================================
 
-Sub WaitToStart
-    Static mouseDown%, selected%
+Function difficulty%
     Dim mousePos As VECTORF
-    Dim w%, h%
-    w% = 93 * _Width(0) / SCREEN_WIDTH
-    h% = 46 * _Height(0) / SCREEN_HEIGHT
     mousePos.x! = _MouseX - _Width(0) / 2
     mousePos.y! = _Height(0) / 2 - _MouseY
+    Dim w%, h%, i%
+    w% = 119 * _Width(0) / SCREEN_WIDTH
+    h% = 20 * _Height(0) / SCREEN_HEIGHT
+    difficulty% = -1
+    If Not Abs(mousePos.x!) < w% Then Exit Function
+    For i% = 0 To 2
+        If mousePos.y! < -12 - 98 * i% + h% And mousePos.y! > -12 - 98 * i% - h% Then difficulty% = i%: Exit Function
+    Next i%
+End Function
+
+Sub WaitToStart
+    Static mouseDown%, selected%
     If _MouseButton(1) And Not mouseDown% Then
-        selected% = Abs(mousePos.x!) < w% And Abs(mousePos.y!) < h%
+        selected% = difficulty%
     Else
         If Not _MouseButton(1) And mouseDown% Then
-            If selected% Then
-                If Abs(mousePos.x!) < w% And Abs(mousePos.y!) < h% Then
+            If selected% > -1 Then
+                If selected% = difficulty% Then
+                    game.level% = selected%
                     SetGameState STATE_NEWGAME
                     mouseDown% = FALSE
-                    selected% = FALSE
+                    selected% = -1
                     Exit Sub
                 Else
-                    selected% = FALSE
+                    selected% = -1
                 End If
             End If
         End If
     End If
     mouseDown% = _MouseButton(1)
-    If Not mouseDown% Then selected% = FALSE
+    If Not mouseDown% Then selected% = -1
 End Sub
 
 Sub GameOver
@@ -404,11 +446,12 @@ Sub CreateBonus (bonus As BONUSDATA, xpos%)
     Dim r%
     r% = Int(Rnd * PROB_TOTAL)
     If r% < PROB_PLUS_ONE Then
+        If game.totalBalls% + 1 > MAX_BALLS Then Exit Sub
         bonus.type = BONUS_PLUS_ONE
     Else
         r% = r% - PROB_PLUS_ONE
-
         If r% < PROB_PLUS_TWO Then
+            If game.totalBalls% + 2 > MAX_BALLS Then Exit Sub
             bonus.type = BONUS_PLUS_TWO
         Else
             r% = r% - PROB_PLUS_TWO
@@ -565,7 +608,21 @@ Sub AddRow
             End If
             CreatePoly poly(game.totalPolys%), -GAME_WIDTH / 2 + columnWidth! * (i% + (1 + game.rowCount% Mod 2) / 2), distribution%(i%), deltaRot!
         Else
-            If game.rowCount% < 5 Then m! = 0.5 Else m! = 0.15
+            If game.rowCount% < 5 Then
+                m! = 0.5
+            Else
+                If game.level = EASY Then
+                    m! = 0.5
+                ElseIf game.level = MEDIUM Then
+                    If game.rowCount% < 35 Then
+                        m! = 0.5 - (0.5 - 0.10) / 30 * (game.rowCount% - 4)
+                    Else
+                        m! = 0.10
+                    End If
+                Else
+                    m! = 0.15
+                End If
+            End If
             If Rnd < m! Then
                 CreateBonus bonus(game.totalBonuses%), -GAME_WIDTH / 2 + columnWidth! * (i% + (1 + game.rowCount% Mod 2) / 2)
             End If
@@ -604,7 +661,7 @@ Sub HitPoly (poly As POLYDATA, damage%)
         poly.hitEffect% = 20
     End If
     game.score% = game.score% + d% * 5
-    If game.score% > game.hiscore% Then game.hiscore% = game.score%
+    If game.score% > hiscore%(game.level%) Then hiscore%(game.level%) = game.score%
 End Sub
 
 Sub ScrollPolygons
@@ -913,6 +970,8 @@ Sub RenderOverlay
 End Sub
 
 Sub RenderStart
+    Dim d%
+    d% = difficulty%
     _glColor4f 1, 1, 1, 1
     _glEnable _GL_TEXTURE_2D
     _glEnable _GL_BLEND
@@ -920,13 +979,49 @@ Sub RenderStart
     _glBindTexture _GL_TEXTURE_2D, glData.start&
     _glBegin _GL_QUADS
     _glTexCoord2f 0, 1
-    _glVertex2f -93, 46
+    _glVertex2f -103, 127
     _glTexCoord2f 1, 1
-    _glVertex2f 93, 46
+    _glVertex2f 103, 127
     _glTexCoord2f 1, 0
-    _glVertex2f 93, -46
+    _glVertex2f 103, -127
     _glTexCoord2f 0, 0
-    _glVertex2f -93, -46
+    _glVertex2f -103, -127
+    _glEnd
+    If d% = EASY Then _glColor3f 1, 1, 1 Else _glColor3f 0.5, 0.5, 0.5
+    _glBindTexture _GL_TEXTURE_2D, glData.easy&
+    _glBegin _GL_QUADS
+    _glTexCoord2f 0, 1
+    _glVertex2f -103, 127
+    _glTexCoord2f 1, 1
+    _glVertex2f 103, 127
+    _glTexCoord2f 1, 0
+    _glVertex2f 103, -127
+    _glTexCoord2f 0, 0
+    _glVertex2f -103, -127
+    _glEnd
+    If d% = MEDIUM Then _glColor3f 1, 1, 1 Else _glColor3f 0.5, 0.5, 0.5
+    _glBindTexture _GL_TEXTURE_2D, glData.normal&
+    _glBegin _GL_QUADS
+    _glTexCoord2f 0, 1
+    _glVertex2f -103, 127
+    _glTexCoord2f 1, 1
+    _glVertex2f 103, 127
+    _glTexCoord2f 1, 0
+    _glVertex2f 103, -127
+    _glTexCoord2f 0, 0
+    _glVertex2f -103, -127
+    _glEnd
+    If d% = HARD Then _glColor3f 1, 1, 1 Else _glColor3f 0.5, 0.5, 0.5
+    _glBindTexture _GL_TEXTURE_2D, glData.difficult&
+    _glBegin _GL_QUADS
+    _glTexCoord2f 0, 1
+    _glVertex2f -103, 127
+    _glTexCoord2f 1, 1
+    _glVertex2f 103, 127
+    _glTexCoord2f 1, 0
+    _glVertex2f 103, -127
+    _glTexCoord2f 0, 0
+    _glVertex2f -103, -127
     _glEnd
     _glDisable _GL_BLEND
     _glDisable _GL_TEXTURE_2D
@@ -1174,10 +1269,10 @@ Sub RenderFrame
     If state.state% = STATE_AIM Then RenderTarget
     If state.state% = STATE_FIRE Then RenderBalls
     RenderOverlay
-    RenderNumber glData.bubbleText&, game.hiscore%, 200, 130, 16, 0, 0, 0
-    RenderNumber glData.bubbleText&, game.score%, 200, 66, 16, 0, 0, 0
-    RenderNumber glData.bubbleText&, game.rowCount%, 200, 16, 16, 0, 0, 0
-    RenderNumber glData.bubbleText&, game.totalBalls%, 200, -32, 16, 0, 0, 0
+    RenderNumber glData.bubbleText&, hiscore%(game.level%), 200, 130, 12, 0, 0, 0
+    RenderNumber glData.bubbleText&, game.score%, 200, 66, 12, 0, 0, 0
+    RenderNumber glData.bubbleText&, game.rowCount%, 200, 16, 12, 0, 0, 0
+    RenderNumber glData.bubbleText&, game.totalBalls%, 200, -32, 12, 0, 0, 0
     If state.state% = STATE_WAIT_TO_START Then RenderStart
 End Sub
 
@@ -1222,6 +1317,9 @@ Sub _GL
         glData.bubbleText& = LoadTexture&("assets/bubble-numbers.png")
         glData.bonuses& = LoadTexture&("assets/bonuses.png")
         glData.start& = LoadTexture&("assets/start.png")
+        glData.easy& = LoadTexture&("assets/easy.png")
+        glData.normal& = LoadTexture&("assets/normal.png")
+        glData.difficult& = LoadTexture&("assets/difficult.png")
     End If
     _glMatrixMode _GL_PROJECTION
     _glLoadIdentity
