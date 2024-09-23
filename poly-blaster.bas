@@ -89,9 +89,9 @@ Const HARD = 2
 '======================================================================================================================================================================================================
 
 Type HISCORE
-    easy As Integer
-    medium As Integer
-    hard As Integer
+    easy As Long
+    medium As Long
+    hard As Long
 End Type
 
 Type GAME
@@ -101,7 +101,7 @@ Type GAME
     totalBonuses As Integer
     totalPolys As Integer
     fps As Integer
-    score As Integer
+    score As Long
     level As Integer
 End Type
 
@@ -190,7 +190,7 @@ Dim Shared sfx(3) As SFX
 Dim Shared quit As Integer
 Dim Shared exitProgram As Integer
 Dim Shared GRAVITY!
-Dim Shared hiscore%(3)
+Dim Shared hiscore&(3)
 
 '===== Game loop ======================================================================================================================================================================================
 
@@ -244,22 +244,22 @@ End Sub
 ' ReadHiscores
 ' - Read high scores from local storage (with fallback to initialising data if there's an error while reading the file for any reason)
 Sub ReadHiscore
-    Dim handle&, s%, v%
+    Dim handle&, s&, v%
     On Error GoTo fileReadError
     If Not _FileExists("scores.txt") Then InitialiseHiscore: Exit Sub
     handle& = FreeFile
     Open "scores.txt" For Input As #handle&
-    Input #handle&, s%
+    Input #handle&, s&
     If EOF(handle&) Then
         ' This was a high score file containing only hard level high score (before a version number was introduced)
-        hiscore%(EASY) = 0
-        hiscore%(MEDIUM) = 0
-        hiscore%(HARD) = s%
+        hiscore&(EASY) = 0
+        hiscore&(MEDIUM) = 0
+        hiscore&(HARD) = s&
     Else
-        v% = s%
-        Input #handle&, hiscore%(EASY)
-        Input #handle&, hiscore%(MEDIUM)
-        Input #handle&, hiscore%(HARD)
+        v% = s&
+        Input #handle&, hiscore&(EASY)
+        Input #handle&, hiscore&(MEDIUM)
+        Input #handle&, hiscore&(HARD)
     End If
     Close #handle&
     On Error GoTo 0
@@ -268,9 +268,9 @@ End Sub
 ' InitialiseHiscores
 ' - Set up default high score values
 Sub InitialiseHiscore
-    hiscore%(EASY) = 0
-    hiscore%(MEDIUM) = 0
-    hiscore%(HARD) = 0
+    hiscore&(EASY) = 0
+    hiscore&(MEDIUM) = 0
+    hiscore&(HARD) = 0
 End Sub
 
 ' WriteHiscores
@@ -281,9 +281,9 @@ Sub WriteHiscore
     handle& = FreeFile
     Open "scores.txt" For Output As #handle&
     Print #handle&, VERSION
-    Print #handle&, hiscore%(EASY)
-    Print #handle&, hiscore%(MEDIUM)
-    Print #handle&, hiscore%(HARD)
+    Print #handle&, hiscore&(EASY)
+    Print #handle&, hiscore&(MEDIUM)
+    Print #handle&, hiscore&(HARD)
     Close #handle&
     On Error GoTo 0
 End Sub
@@ -367,7 +367,7 @@ Sub InitialiseGame
     game.activeBalls% = 0
     game.totalPolys% = 0
     game.totalBonuses% = 0
-    game.score% = 0
+    game.score& = 0
 End Sub
 
 '======================================================================================================================================================================================================
@@ -660,8 +660,8 @@ Sub HitPoly (poly As POLYDATA, damage%)
     Else
         poly.hitEffect% = 20
     End If
-    game.score% = game.score% + d% * 5
-    If game.score% > hiscore%(game.level%) Then hiscore%(game.level%) = game.score%
+    game.score& = game.score& + d% * 5
+    If game.score& > hiscore&(game.level%) Then hiscore&(game.level%) = game.score&
 End Sub
 
 Sub ScrollPolygons
@@ -1027,9 +1027,9 @@ Sub RenderStart
     _glDisable _GL_TEXTURE_2D
 End Sub
 
-Sub RenderNumber (binding&, number%, centreX%, centreY%, charSize%, r%, g%, b%)
+Sub RenderNumber (binding&, number&, centreX%, centreY%, charSize%, r%, g%, b%)
     Dim x%, d%, d$, tx!
-    d$ = LTrim$(Str$(number%))
+    d$ = LTrim$(Str$(number&))
     d% = Len(d$)
     x% = centreX% + (d% - 1) * charSize% / 2
     _glColor4f r%, g%, b%, 1
@@ -1269,8 +1269,8 @@ Sub RenderFrame
     If state.state% = STATE_AIM Then RenderTarget
     If state.state% = STATE_FIRE Then RenderBalls
     RenderOverlay
-    RenderNumber glData.bubbleText&, hiscore%(game.level%), 200, 130, 12, 0, 0, 0
-    RenderNumber glData.bubbleText&, game.score%, 200, 66, 12, 0, 0, 0
+    RenderNumber glData.bubbleText&, hiscore&(game.level%), 200, 130, 12, 0, 0, 0
+    RenderNumber glData.bubbleText&, game.score&, 200, 66, 12, 0, 0, 0
     RenderNumber glData.bubbleText&, game.rowCount%, 200, 16, 12, 0, 0, 0
     RenderNumber glData.bubbleText&, game.totalBalls%, 200, -32, 12, 0, 0, 0
     If state.state% = STATE_WAIT_TO_START Then RenderStart
