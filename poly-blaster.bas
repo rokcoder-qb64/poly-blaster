@@ -166,6 +166,9 @@ Type GLDATA
     easy As Long
     normal As Long
     difficult As Long
+    easy_hi As Long
+    normal_hi As Long
+    hard_hi As Long
 End Type
 
 Type SFX
@@ -950,6 +953,7 @@ Sub RenderBackground
 End Sub
 
 Sub RenderOverlay
+    Dim tex&
     _glColor4f 1, 1, 1, 1
     _glEnable _GL_TEXTURE_2D
     _glEnable _GL_BLEND
@@ -965,8 +969,38 @@ Sub RenderOverlay
     _glTexCoord2f 0, 0
     _glVertex2f -240, -180
     _glEnd
+    RenderHi 37, 117, glData.easy_hi&
+    RenderHi 37, 17, glData.normal_hi&
+    RenderHi 37, -83, glData.hard_hi&
+    If game.level% = EASY Then
+        tex& = glData.easy_hi&
+    ElseIf game.level% = MEDIUM Then
+        tex& = glData.normal_hi&
+    Else
+        tex& = glData.hard_hi&
+    End If
+    RenderHi 202 + _Width / 2, 117, tex&
     _glDisable _GL_BLEND
     _glDisable _GL_TEXTURE_2D
+End Sub
+
+Sub RenderHi (x%, y%, tex&)
+    Dim halfw!, halfh!
+    halfw! = 67 / 2
+    halfh! = 42 / 2
+    x% = x% - _Width / 2
+    y% = y%
+    _glBindTexture _GL_TEXTURE_2D, tex&
+    _glBegin _GL_QUADS
+    _glTexCoord2f 0, 1
+    _glVertex2f x% - halfw!, y% + halfh!
+    _glTexCoord2f 1, 1
+    _glVertex2f x% + halfw!, y% + halfh!
+    _glTexCoord2f 1, 0
+    _glVertex2f x% + halfw!, y% - halfh!
+    _glTexCoord2f 0, 0
+    _glVertex2f x% - halfw!, y% - halfh!
+    _glEnd
 End Sub
 
 Sub RenderStart
@@ -1269,10 +1303,13 @@ Sub RenderFrame
     If state.state% = STATE_AIM Then RenderTarget
     If state.state% = STATE_FIRE Then RenderBalls
     RenderOverlay
-    RenderNumber glData.bubbleText&, hiscore&(game.level%), 200, 130, 12, 0, 0, 0
-    RenderNumber glData.bubbleText&, game.score&, 200, 66, 12, 0, 0, 0
-    RenderNumber glData.bubbleText&, game.rowCount%, 200, 16, 12, 0, 0, 0
-    RenderNumber glData.bubbleText&, game.totalBalls%, 200, -32, 12, 0, 0, 0
+    RenderNumber glData.bubbleText&, hiscore&(game.level%), 202, 86, 12, 0, 0, 0
+    RenderNumber glData.bubbleText&, game.score&, 202, 23, 12, 0, 0, 0
+    RenderNumber glData.bubbleText&, game.rowCount%, 202, -27, 12, 0, 0, 0
+    RenderNumber glData.bubbleText&, game.totalBalls%, 202, -75, 12, 0, 0, 0
+    RenderNumber glData.bubbleText&, hiscore&(EASY), 37 - _Width / 2, 86, 12, 0, 0, 0
+    RenderNumber glData.bubbleText&, hiscore&(MEDIUM), 37 - _Width / 2, -14, 12, 0, 0, 0
+    RenderNumber glData.bubbleText&, hiscore&(HARD), 37 - _Width / 2, -114, 12, 0, 0, 0
     If state.state% = STATE_WAIT_TO_START Then RenderStart
 End Sub
 
@@ -1320,6 +1357,9 @@ Sub _GL
         glData.easy& = LoadTexture&("assets/easy.png")
         glData.normal& = LoadTexture&("assets/normal.png")
         glData.difficult& = LoadTexture&("assets/difficult.png")
+        glData.easy_hi& = LoadTexture&("assets/easy hi.png")
+        glData.normal_hi& = LoadTexture&("assets/normal hi.png")
+        glData.hard_hi& = LoadTexture&("assets/hard hi.png")
     End If
     _glMatrixMode _GL_PROJECTION
     _glLoadIdentity
