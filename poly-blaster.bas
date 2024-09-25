@@ -1,5 +1,5 @@
 '======================================================================================================================================================================================================
-' Poly Blaster                                                                                                                               bb
+' Poly Blaster
 '------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ' Programmed by RokCoder
 '------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -28,7 +28,6 @@ $VersionInfo:OriginalFilename='poly-blaster.exe'
 $VersionInfo:LegalCopyright='(c)2024 RokSoft'
 $VersionInfo:FILEVERSION#=0,1,0,0
 $VersionInfo:PRODUCTVERSION#=0,1,0,0
-'$ExeIcon:'./assets/poly-blaster.ico'  'TODO Uncommenting this causes a crash
 
 '======================================================================================================================================================================================================
 
@@ -61,6 +60,8 @@ Const STATE_WAIT_TO_START = 6
 
 Const TARGET_BALLS = 10 'Number of balls to display in trajectory
 Const LONG_TARGET_BALLS = 40 'Number of balls to display in trajectory when using extended target
+
+Const GRAVITY! = -1! * 0.4! ' This should just be -0.4. However the current version of QB64PE has a bug (#542) in the CONST eval code!
 
 Const POLY_RADIUS = 20
 Const MAX_POLYS = 100 'This should be calculated but is definitely more than enough for a screen full of polygons
@@ -195,7 +196,6 @@ Dim Shared game As GAME ' General game data
 Dim Shared sfx(3) As SFX
 Dim Shared quit As Integer
 Dim Shared exitProgram As Integer
-Dim Shared GRAVITY!
 Dim Shared hiscore&(3)
 Dim Shared trajectory(LONG_TARGET_BALLS) As VECTORF
 
@@ -229,17 +229,17 @@ Sub PrepareGame
     m% = Int((_DesktopHeight - 80) / SCREEN_HEIGHT) ' Ratio for how much we can scale the game up (integer values) whilst still fitting vertically on the screen
     virtualScreen& = _NewImage(SCREEN_WIDTH, SCREEN_HEIGHT, 32) ' This is the same resolution as the original arcade game
     Screen _NewImage(SCREEN_WIDTH * m%, SCREEN_HEIGHT * m%, 32) ' The screen we ultimately display is the defined size multiplied by a ratio as determined above
-    _Delay 0.5
+    Do: _Delay 0.5: Loop Until _ScreenExists
     _ScreenMove _Middle
     $Resize:Stretch
     _AllowFullScreen _SquarePixels , _Smooth
     _Title "Poly Blaster"
+    $ExeIcon:'./assets/poly-blaster.ico'
     _Dest virtualScreen&
     game.fps% = 30 ' 30 frames per second
     Randomize Timer
     glData.executing = TRUE
     _DisplayOrder _Hardware , _GLRender , _Software
-    GRAVITY! = -0.4 ' This should be a const but QB64pe doesn't allow fractional negative const values!
     LoadAllSFX
     ReadHiscore ' Read high scores from file (or create them if the file doesn't exist or can't be read)
     SetGameState STATE_WAIT_TO_START ' Set the game state in its initial state
@@ -1418,4 +1418,3 @@ Sub _GL
 End Sub
 
 '======================================================================================================================================================================================================
-
