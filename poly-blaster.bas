@@ -59,7 +59,8 @@ Const STATE_NEXT_ROW = 4
 Const STATE_GAMEOVER = 5
 Const STATE_WAIT_TO_START = 6
 
-Const TARGET_BALLS = 10
+Const TARGET_BALLS = 10 'Number of balls to display in trajectory
+Const LONG_TARGET_BALLS = 40 'Number of balls to display in trajectory when using extended target
 
 Const POLY_RADIUS = 20
 Const MAX_POLYS = 100 'This should be calculated but is definitely more than enough for a screen full of polygons
@@ -104,6 +105,7 @@ Type GAME
     fps As Integer
     score As Long
     level As Integer
+    longTarget As Integer
 End Type
 
 Type VECTORF
@@ -195,6 +197,7 @@ Dim Shared quit As Integer
 Dim Shared exitProgram As Integer
 Dim Shared GRAVITY!
 Dim Shared hiscore&(3)
+Dim Shared trajectory(LONG_TARGET_BALLS) As VECTORF
 
 '===== Game loop ======================================================================================================================================================================================
 
@@ -241,6 +244,7 @@ Sub PrepareGame
     ReadHiscore ' Read high scores from file (or create them if the file doesn't exist or can't be read)
     SetGameState STATE_WAIT_TO_START ' Set the game state in its initial state
     game.level% = MEDIUM
+    game.longTarget% = FALSE
 End Sub
 
 '===== High score code ================================================================================================================================================================================
@@ -450,7 +454,21 @@ Sub GetTargetDirection
     target.velocity.x! = Cos(launchAngle!) * LAUNCH_VELOCITY
     target.velocity.y! = Sin(launchAngle!) * LAUNCH_VELOCITY
     If mousePos.x! < 0 Then target.velocity.x! = -target.velocity.x!
+    If game.longTarget% Then CalculateTrajectory
     If _MouseButton(1) Then SetGameState STATE_FIRE
+End Sub
+
+Sub CalculateTrajectory
+    Dim i%
+    ball(0).vel = target.velocity
+    ball(0).pos.x! = 0
+    ball(0).pos.y! = _Height / 2
+    ball(0).delay% = 0
+    ball(0).size% = 0
+    For i% = 0 To LONG_TARGET_BALLS
+        trajectory(i%) = ball(0).pos
+        UpdateBall ball(0)
+    Next
 End Sub
 
 '======================================================================================================================================================================================================
@@ -722,10 +740,9 @@ Function CheckForBallAgainstAllPolys% (ball As BALL)
         Dim collision%, normal As VECTORF
         CheckBallAgainstPoly ball, id%, collision%, normal
         If collision% Then
-            CalculateBounceTrajectory ball.vel, normal
-            HitPoly poly(id%), ball.multiplier%
             CheckForBallAgainstAllPolys% = TRUE
-            PlaySfx SFX_CLICK
+            CalculateBounceTrajectory ball.vel, normal
+            If state.state% = STATE_FIRE Then HitPoly poly(id%), ball.multiplier%: PlaySfx SFX_CLICK
         End If
     End If
 End Function
@@ -909,7 +926,7 @@ Sub UpdateBall (ball As BALL)
         For i% = 1 To Ceiling(mag!)
             ball.pos.x! = ball.pos.x! + unitVel.x! * deltaMag!
             ball.pos.y! = ball.pos.y! + unitVel.y! * deltaMag!
-            CheckForBallAgainstAllBonuses ball
+            If state.state% = STATE_FIRE Then CheckForBallAgainstAllBonuses ball
             If CheckForBallAgainstAllPolys%(ball) Then
                 Exit Sub ' We've collided with a poly so it's been updated and there's nothing else to do with this ball
             End If
@@ -1180,18 +1197,33 @@ Sub RenderTarget
     Dim i%, j!
     Dim r!
     r! = 6
-    For i% = 0 To TARGET_BALLS
-        _glPushMatrix
-        _glTranslatef target.velocity.x! * i%, _Height / 2 + target.velocity.y! * i% + GRAVITY * i% * i% / 2, 0
-        _glScalef 1 - i% * 0.03, 1 - i% * 0.03, 1
-        _glColor3f 1, 1, 0.7
-        _glBegin _GL_TRIANGLE_FAN
-        For j! = 0 To _Pi(2) Step .2
-            _glVertex2f Cos(j!) * r!, Sin(j!) * r!
+    If game.longTarget% Then
+        For i% = 0 To LONG_TARGET_BALLS
+            _glPushMatrix
+            _glTranslatef trajectory(i%).x!, trajectory(i%).y!, 0
+            _glScalef 1 - i% * (0.9 / LONG_TARGET_BALLS), 1 - i% * (0.9 / LONG_TARGET_BALLS), 1
+            _glColor3f 1, 1, 0.7
+            _glBegin _GL_TRIANGLE_FAN
+            For j! = 0 To _Pi(2) Step .2
+                _glVertex2f Cos(j!) * r!, Sin(j!) * r!
+            Next
+            _glEnd
+            _glPopMatrix
         Next
-        _glEnd
-        _glPopMatrix
-    Next
+    Else
+        For i% = 0 To TARGET_BALLS
+            _glPushMatrix
+            _glTranslatef target.velocity.x! * i%, _Height / 2 + target.velocity.y! * i% + GRAVITY * i% * i% / 2, 0
+            _glScalef 1 - i% * 0.03, 1 - i% * 0.03, 1
+            _glColor3f 1, 1, 0.7
+            _glBegin _GL_TRIANGLE_FAN
+            For j! = 0 To _Pi(2) Step .2
+                _glVertex2f Cos(j!) * r!, Sin(j!) * r!
+            Next
+            _glEnd
+            _glPopMatrix
+        Next
+    End If
 End Sub
 
 Sub RenderBalls
