@@ -65,6 +65,7 @@ Const POLY_RADIUS = 20
 Const MAX_POLYS = 100 'This should be calculated but is definitely more than enough for a screen full of polygons
 Const BALL_RADIUS = 6
 Const MAX_BALLS = 50
+Const LAUNCH_VELOCITY = 22
 
 Const MAX_BONUSES = 100 'This should be calculated but is definitely more than enough for a screen full of bonuses
 Const BONUS_RADIUS = 10
@@ -431,15 +432,24 @@ End Sub
 '======================================================================================================================================================================================================
 
 Sub GetTargetDirection
+    ' Calculations ensure that ball trajectory passes through mouse pointer position
     Dim mousePos As VECTORF
-    Dim l!
-    mousePos.x! = _MouseX - _Width(0) / 2
-    mousePos.y! = _MouseY
-    l! = GetMagnitude(mousePos)
-    mousePos.x! = mousePos.x! * 220 / l!
-    mousePos.y! = mousePos.y! * 220 / l!
-    target.velocity.x! = mousePos.x! / TARGET_BALLS
-    target.velocity.y! = -(mousePos.y! - GRAVITY * TARGET_BALLS * TARGET_BALLS / 2) / TARGET_BALLS
+    Dim screenScale!
+    Dim launchAngle!
+    Dim deltaPos As VECTORF
+    screenScale! = _Width / _Width(0)
+    mousePos.x! = screenScale! * (_MouseX - _Width(0) / 2)
+    mousePos.y! = screenScale! * _MouseY
+    deltaPos.x! = Abs(mousePos.x!)
+    deltaPos.y! = -mousePos.y!
+    If GRAVITY ^ 2 * deltaPos.x! ^ 2 = 0 Then
+        launchAngle! = -_Pi / 2
+    Else
+        launchAngle! = Atn(-LAUNCH_VELOCITY ^ 2 / (GRAVITY * deltaPos.x!) - Sqr(LAUNCH_VELOCITY ^ 2 * (LAUNCH_VELOCITY ^ 2 + 2 * GRAVITY * deltaPos.y!) / (GRAVITY ^ 2 * deltaPos.x! ^ 2) - 1))
+    End If
+    target.velocity.x! = Cos(launchAngle!) * LAUNCH_VELOCITY
+    target.velocity.y! = Sin(launchAngle!) * LAUNCH_VELOCITY
+    If mousePos.x! < 0 Then target.velocity.x! = -target.velocity.x!
     If _MouseButton(1) Then SetGameState STATE_FIRE
 End Sub
 
